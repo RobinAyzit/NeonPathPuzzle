@@ -21,12 +21,6 @@ export interface GeneratedLevel {
 
 export function generateLevel(levelId: number): GeneratedLevel {
   // 1. Determine parameters based on level ID (Aggressive Difficulty scaling)
-  // Level 1-5: 3x3
-  // Level 6-15: 4x4
-  // Level 16-30: 5x5
-  // Level 31-50: 6x6
-  // Level 51-75: 7x7
-  // Level 76-100: 8x8
   let gridSize = 3;
   if (levelId > 5) gridSize = 4;
   if (levelId > 15) gridSize = 5;
@@ -38,7 +32,6 @@ export function generateLevel(levelId: number): GeneratedLevel {
   const rng = mulberry32(levelId * 1337 + 42);
 
   // 2. Generate a valid Hamiltonian path on a subset of the grid
-  // Target length increases with levelId within the same gridSize
   const gridCells = gridSize * gridSize;
   const progressInTier = levelId / 100; 
   const minLengthFactor = 0.5 + (progressInTier * 0.45); // Scales from 50% to 95% of grid
