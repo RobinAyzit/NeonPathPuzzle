@@ -103,48 +103,56 @@ export function GameCanvas({ level, onComplete, showHint, hintPath }: GameCanvas
     }
 
     // 2. Draw Start Node
-    const startPixel = getPixel(level.start);
-    ctx.beginPath();
-    ctx.arc(startPixel.x, startPixel.y, cellSize * 0.25, 0, Math.PI * 2);
-    ctx.fillStyle = "#00f3ff"; // Neon Cyan
-    ctx.shadowColor = "#00f3ff";
-    ctx.shadowBlur = 15;
-    ctx.fill();
-    ctx.shadowBlur = 0; // Reset
+    if (level.start) {
+      const startPixel = getPixel(level.start);
+      ctx.beginPath();
+      ctx.arc(startPixel.x, startPixel.y, cellSize * 0.25, 0, Math.PI * 2);
+      ctx.fillStyle = "#00f3ff"; // Neon Cyan
+      ctx.shadowColor = "#00f3ff";
+      ctx.shadowBlur = 15;
+      ctx.fill();
+      ctx.shadowBlur = 0; // Reset
+    }
 
     // 3. Draw Connected Path
     if (path.length > 1) {
       ctx.beginPath();
       const p0 = getPixel(path[0]);
-      ctx.moveTo(p0.x, p0.y);
-      
-      for (let i = 1; i < path.length; i++) {
-        const pi = getPixel(path[i]);
-        ctx.lineTo(pi.x, pi.y);
+      if (p0) {
+        ctx.moveTo(p0.x, p0.y);
+        
+        for (let i = 1; i < path.length; i++) {
+          const pi = getPixel(path[i]);
+          if (pi) ctx.lineTo(pi.x, pi.y);
+        }
+        
+        ctx.lineCap = "round";
+        ctx.lineJoin = "round";
+        ctx.lineWidth = cellSize * 0.15;
+        ctx.strokeStyle = "#00f3ff";
+        ctx.shadowColor = "#00f3ff";
+        ctx.shadowBlur = 20;
+        ctx.stroke();
+        ctx.shadowBlur = 0;
       }
-      
-      ctx.lineCap = "round";
-      ctx.lineJoin = "round";
-      ctx.lineWidth = cellSize * 0.15;
-      ctx.strokeStyle = "#00f3ff";
-      ctx.shadowColor = "#00f3ff";
-      ctx.shadowBlur = 20;
-      ctx.stroke();
-      ctx.shadowBlur = 0;
     }
 
     // 4. Draw Current Head
-    const currentHead = path[path.length - 1];
-    const headPixel = getPixel(currentHead);
-    
-    // Pulse animation for head
-    const time = Date.now() / 500;
-    const pulseSize = cellSize * 0.2 + Math.sin(time) * 2;
-    
-    ctx.beginPath();
-    ctx.arc(headPixel.x, headPixel.y, pulseSize, 0, Math.PI * 2);
-    ctx.fillStyle = "#ffffff";
-    ctx.fill();
+    if (path.length > 0) {
+      const currentHead = path[path.length - 1];
+      const headPixel = getPixel(currentHead);
+      
+      if (headPixel) {
+        // Pulse animation for head
+        const time = Date.now() / 500;
+        const pulseSize = cellSize * 0.2 + Math.sin(time) * 2;
+        
+        ctx.beginPath();
+        ctx.arc(headPixel.x, headPixel.y, pulseSize, 0, Math.PI * 2);
+        ctx.fillStyle = "#ffffff";
+        ctx.fill();
+      }
+    }
 
     // 5. Draw Hints (if active)
     if (showHint && hintPath) {
