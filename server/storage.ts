@@ -1,38 +1,48 @@
-import { type User, type InsertUser } from "@shared/schema";
-import { randomUUID } from "crypto";
 
-// modify the interface with any CRUD methods
-// you might need
+import { userProgress, type InsertProgressSchema } from "@shared/schema";
+import { db } from "./db";
+import { eq, and } from "drizzle-orm";
 
 export interface IStorage {
-  getUser(id: string): Promise<User | undefined>;
-  getUserByUsername(username: string): Promise<User | undefined>;
-  createUser(user: InsertUser): Promise<User>;
+  getUserProgress(userId: string): Promise<number[]>;
+  updateUserProgress(userId: string, levelId: number, completed: boolean, hintsUsed: boolean): Promise<void>;
 }
 
-export class MemStorage implements IStorage {
-  private users: Map<string, User>;
-
-  constructor() {
-    this.users = new Map();
+export class DatabaseStorage implements IStorage {
+  async getUserProgress(userId: string): Promise<number[]> {
+    const progress = await db
+      .select()
+      .from(userProgress)
+      .where(and(eq(userProgress.userId, userId), eq(userProgress.completed, true)));
+    
+    return progress.map(p => p.levelId);
   }
 
-  async getUser(id: string): Promise<User | undefined> {
-    return this.users.get(id);
-  }
+  async updateUserProgress(userId: string, levelId: number, completed: boolean, hintsUsed: boolean): Promise<void> {
+    // Check if exists
+    const [existing] = await db
+      .select()
+      .from(userProgress)
+      .where(and(eq(userProgress.userId, userId), eq(userProgress.levelId, levelId)));
 
-  async getUserByUsername(username: string): Promise<User | undefined> {
-    return Array.from(this.users.values()).find(
-      (user) => user.username === username,
-    );
-  }
-
-  async createUser(insertUser: InsertUser): Promise<User> {
-    const id = randomUUID();
-    const user: User = { ...insertUser, id };
-    this.users.set(id, user);
-    return user;
+    if (existing) {
+      await db
+        .update(userProgress)
+        .set({ 
+          completed: completed || existing.completed, 
+          hintsUsed: hintsUsed || existing.hintsUsed,
+          updatedAt: new Date() 
+        })
+        .where(eq(userProgress.id, existing.id));
+    } else {
+      await db.insert(userProgress).values({
+        userId,
+        levelId,
+        completed,
+        hintsUsed,
+      });
+    }
   }
 }
 
-export const storage = new MemStorage();
+export const storage = new DatabaseStorage();
