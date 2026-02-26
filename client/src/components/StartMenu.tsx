@@ -2,10 +2,12 @@ import { useState, useEffect, useRef } from "react";
 import { useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
-import { X, Lock, CheckCircle, Heart, Play, HelpCircle, Trophy, Zap, Shield, Star } from "lucide-react";
+import { X, Lock, CheckCircle, Heart, Play, HelpCircle, Trophy, Zap, Shield, Star, Palette, Check } from "lucide-react";
 import { generateLevelCode, getLevelFromCode } from "@/lib/levelCodes";
 import { getLevelMessage } from "@/lib/levelMessages";
 import { useLevels, useUserId } from "@/hooks/use-game";
+import { useTheme } from "@/hooks/use-theme";
+import { themes } from "@/lib/themes";
 import { playClickSound } from "@/lib/sounds";
 
 interface StartMenuProps {
@@ -16,6 +18,7 @@ type MenuScreen = "main" | "info" | "completed";
 
 function ParticleBackground() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const { getThemeColors } = useTheme();
   
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -46,6 +49,7 @@ function ParticleBackground() {
     
     const animate = () => {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
+      const colors = getThemeColors();
       
       particles.forEach(p => {
         p.x += p.vx;
@@ -56,7 +60,7 @@ function ParticleBackground() {
         
         ctx.beginPath();
         ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
-        ctx.fillStyle = `rgba(0, 243, 255, ${p.alpha})`;
+        ctx.fillStyle = colors.primary + Math.floor(p.alpha * 255).toString(16).padStart(2, '0');
         ctx.fill();
         
         // Connect nearby particles
@@ -68,7 +72,7 @@ function ParticleBackground() {
             ctx.beginPath();
             ctx.moveTo(p.x, p.y);
             ctx.lineTo(p2.x, p2.y);
-            ctx.strokeStyle = `rgba(0, 243, 255, ${0.1 * (1 - dist / 150)})`;
+            ctx.strokeStyle = colors.primary + Math.floor(0.1 * (1 - dist / 150) * 255).toString(16).padStart(2, '0');
             ctx.lineWidth = 0.5;
             ctx.stroke();
           }
@@ -83,7 +87,7 @@ function ParticleBackground() {
       cancelAnimationFrame(animationId);
       window.removeEventListener("resize", resize);
     };
-  }, []);
+  }, [getThemeColors]);
   
   return <canvas ref={canvasRef} className="fixed inset-0 pointer-events-none z-0" />;
 }
@@ -91,6 +95,100 @@ function ParticleBackground() {
 function GlowingOrb({ className, color = "#00f3ff" }: { className?: string; color?: string }) {
   return (
     <div className={`absolute rounded-full blur-[100px] opacity-30 ${className}`} style={{ background: color }} />
+  );
+}
+
+function ThemeButton() {
+  const [showThemeSelector, setShowThemeSelector] = useState(false);
+  const { currentTheme, setTheme } = useTheme();
+  
+  return (
+    <>
+      <Button
+        onClick={() => setShowThemeSelector(true)}
+        variant="outline"
+        className={`
+          h-14 text-base font-orbitron border-accent/50 text-accent
+          hover:bg-accent/10 hover:border-accent hover:shadow-[0_0_20px_rgba(255,255,255,0.2)]
+          transition-all duration-300
+        `}
+      >
+        <Palette className="w-5 h-5 mr-2" />
+        Theme
+      </Button>
+      
+      {showThemeSelector && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
+          <motion.div
+            initial={{ scale: 0.8, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            exit={{ scale: 0.8, opacity: 0 }}
+            className="w-full max-w-md bg-gradient-to-br from-[#0a0f1e] to-[#1a1a2e] border border-primary/30 p-6 rounded-2xl relative overflow-hidden"
+          >
+            <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-primary to-secondary" />
+            
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-xl font-orbitron font-bold text-primary">Choose Theme</h3>
+              <button
+                onClick={() => setShowThemeSelector(false)}
+                className="p-2 text-primary hover:text-secondary transition-colors"
+              >
+                <X size={20} />
+              </button>
+            </div>
+            
+            <div className="space-y-2">
+              {themes.map((theme) => {
+                const isActive = currentTheme === theme.id;
+                return (
+                  <button
+                    key={theme.id}
+                    onClick={() => {
+                      setTheme(theme.id);
+                    }}
+                    className={`w-full text-left p-3 rounded-lg border transition-all ${
+                      isActive
+                        ? 'border-primary bg-primary/10'
+                        : 'border-white/20 hover:border-primary/50 hover:bg-accent'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <div className="font-medium text-white">{theme.name}</div>
+                        <div className="text-sm text-muted-foreground">
+                          {theme.description}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <div className="flex gap-1">
+                          {theme.colors.neon.slice(0, 3).map((color, idx) => (
+                            <div
+                              key={idx}
+                              className="w-3 h-3 rounded-full"
+                              style={{ backgroundColor: color }}
+                            />
+                          ))}
+                        </div>
+                        {isActive && <Check className="w-4 h-4 text-primary" />}
+                      </div>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+            
+            <div className="mt-6 flex justify-end">
+              <Button
+                onClick={() => setShowThemeSelector(false)}
+                className="bg-primary text-black font-bold hover:bg-primary/90"
+              >
+                Done
+              </Button>
+            </div>
+          </motion.div>
+        </div>
+      )}
+    </>
   );
 }
 
@@ -269,6 +367,8 @@ export function StartMenu({ onStart }: StartMenuProps) {
                         Completed
                       </Button>
                     </div>
+
+                    <ThemeButton />
                   </motion.div>
 
                   <motion.div
@@ -320,6 +420,35 @@ export function StartMenu({ onStart }: StartMenuProps) {
                     <div className="text-center">
                       <div className="text-3xl font-orbitron font-bold text-secondary">200</div>
                       <div className="text-xs text-muted-foreground font-exo">TOTAL LEVELS</div>
+                    </div>
+                  </motion.div>
+
+                  <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    transition={{ delay: 1.4 }}
+                    className="pt-8 text-center"
+                  >
+                    <p className="text-xs text-muted-foreground/60 font-exo">
+                      Created 2026 by © nRn World
+                    </p>
+                    <div className="flex items-center justify-center gap-2 mt-1">
+                      <a 
+                        href="mailto:bynrnworld@gmail.com"
+                        className="text-xs text-muted-foreground/40 font-exo hover:text-primary transition-colors"
+                      >
+                        bynrnworld@gmail.com
+                      </a>
+                      <button
+                        onClick={() => {
+                          navigator.clipboard.writeText('bynrnworld@gmail.com');
+                          alert('Email copied to clipboard!');
+                        }}
+                        className="text-xs text-muted-foreground/30 hover:text-primary transition-colors"
+                        title="Copy email"
+                      >
+                        (copy)
+                      </button>
                     </div>
                   </motion.div>
                 </div>

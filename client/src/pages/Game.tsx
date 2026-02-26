@@ -7,6 +7,9 @@ import {
   useUpdateProgress,
   useUserId
 } from "@/hooks/use-game";
+import { usePowerUps, usePowerUpsStore } from "@/hooks/use-powerups";
+import { useAchievements } from "@/hooks/use-achievements";
+import { useTheme } from "@/hooks/use-theme";
 import { Header } from "@/components/Header";
 import { GameCanvas } from "@/components/GameCanvas";
 import { WinModal } from "@/components/WinModal";
@@ -17,11 +20,14 @@ export default function Game() {
   const [, setLocation] = useLocation();
   const levelId = parseInt(params?.id || "1");
   const userId = useUserId();
+  const { hasActiveEffect, getEffectValue, usePowerUp } = usePowerUps();
+  const { updateProgress, checkAchievements } = useAchievements();
+  const { getThemeColors } = useTheme();
 
   // Queries
   const { data: level, isLoading, error } = useLevel(levelId);
   const { data: solution, refetch: fetchHint, isFetching: isHintLoading } = useSolution(levelId);
-  const updateProgress = useUpdateProgress();
+  const updateProgressMutation = useUpdateProgress();
 
   // Local State
   const [showHint, setShowHint] = useState(false);
@@ -30,6 +36,17 @@ export default function Game() {
   const [lives, setLives] = useState(3);
   const [isGameOver, setIsGameOver] = useState(false);
   const [key, setKey] = useState(0); // Used to reset the canvas
+  const [levelStartTime, setLevelStartTime] = useState(Date.now());
+
+  // Apply theme colors on mount and theme change
+  useEffect(() => {
+    const colors = getThemeColors();
+    const root = document.documentElement;
+    
+    Object.entries(colors).forEach(([key, value]) => {
+      root.style.setProperty(`--theme-${key}`, value as string);
+    });
+  }, [getThemeColors]);
 
   // Prevent wheel zoom and enable smooth scrolling
   useEffect(() => {
@@ -64,6 +81,7 @@ export default function Game() {
     setLives(3);
     setIsGameOver(false);
     setKey(prev => prev + 1);
+    setLevelStartTime(Date.now());
   }, [levelId]);
 
   // Auto-hide hint after varying duration based on level
@@ -86,16 +104,34 @@ export default function Game() {
     if (hasWon) return; // Prevent double trigger
     setHasWon(true);
 
-    // Celebration effect
+    // Celebration effect with theme colors
+    const colors = getThemeColors();
     confetti({
       particleCount: 100,
       spread: 70,
       origin: { y: 0.6 },
-      colors: ['#00f3ff', '#8a2be2', '#ffffff']
+      colors: colors.neon
     });
 
+    // Update achievement progress
+    const completionTime = Date.now() - levelStartTime;
+    const perfectLevel = !hintUsedThisLevel && lives === 3;
+    
+    // Update progress
+    updateProgress('levels_completed', levelId);
+    if (perfectLevel) updateProgress('perfect_levels', 1);
+    if (!hintUsedThisLevel) updateProgress('no_hints_used', 1);
+    if (completionTime < 30000) updateProgress('speed_run', 1);
+
+    // Check for new achievements
+    const newAchievements = checkAchievements();
+    if (newAchievements.length > 0) {
+      // Show achievement notifications (could add a toast system here)
+      console.log('New achievements unlocked:', newAchievements);
+    }
+
     // Save progress
-    updateProgress.mutate({
+    updateProgressMutation.mutate({
       userId,
       levelId,
       completed: true,
@@ -105,12 +141,27 @@ export default function Game() {
 
   const handleHint = async () => {
     if (showHint || hintUsedThisLevel) return;
+    
+    // Check if player has path hint power-up
+    if (hasActiveEffect('path_hint')) {
+      setShowHint(true);
+      setHintUsedThisLevel(true);
+      return;
+    }
+    
     await fetchHint();
     setShowHint(true);
     setHintUsedThisLevel(true);
   };
 
   const handleBacktrack = () => {
+    // Check if player has undo protection
+    if (hasActiveEffect('undo_protection')) {
+      // Consume the protection
+      usePowerUpsStore.getState().removeEffect('undo_protection');
+      return;
+    }
+
     const newLives = lives - 1;
     setLives(newLives);
 

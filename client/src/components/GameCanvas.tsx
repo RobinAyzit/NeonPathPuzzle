@@ -2,6 +2,7 @@ import React, { useRef, useEffect, useState, useCallback } from "react";
 import { type LevelResponse, type Point } from "@shared/schema";
 import { motion } from "framer-motion";
 import { playMoveSound, playBacktrackSound, playLoseLifeSound, playWinSound } from "@/lib/sounds";
+import { useTheme } from "@/hooks/use-theme";
 
 interface GameCanvasProps {
   level: LevelResponse;
@@ -16,6 +17,7 @@ interface GameCanvasProps {
 export function GameCanvas({ level, onComplete, showHint, hintPath, onBacktrack, onLoseLife, onWin }: GameCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const { getThemeColors } = useTheme();
 
   // Game State
   const [path, setPath] = useState<Point[]>([]);
@@ -59,127 +61,151 @@ export function GameCanvas({ level, onComplete, showHint, hintPath, onBacktrack,
     return () => window.removeEventListener("resize", updateMetrics);
   }, [updateMetrics]);
 
-  // Drawing Logic
-  useEffect(() => {
+  // Draw function
+  const draw = useCallback(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
+    
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
-    // Clear
-    const dpr = window.devicePixelRatio || 1;
-    ctx.clearRect(0, 0, canvas.width / dpr, canvas.height / dpr);
+    const colors = getThemeColors();
 
-    // Helper to get pixel coordinates
-    const getPixel = (p: Point) => ({
-      x: p.x * cellSize + cellSize / 2 + offset.x,
-      y: p.y * cellSize + cellSize / 2 + offset.y,
+    // Clear canvas
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    // Draw grid
+    ctx.strokeStyle = "rgba(255, 255, 255, 0.05)";
+    ctx.lineWidth = 1;
+    for (let i = 0; i <= level.gridSize; i++) {
+      const pos = i * cellSize;
+      // Vertical lines
+      ctx.beginPath();
+      ctx.moveTo(pos, 0);
+      ctx.lineTo(pos, level.gridSize * cellSize);
+      ctx.stroke();
+      // Horizontal lines
+      ctx.beginPath();
+      ctx.moveTo(0, pos);
+      ctx.lineTo(level.gridSize * cellSize, pos);
+      ctx.stroke();
+    }
+
+    // Draw nodes
+    level.nodes.forEach((node) => {
+      const center = {
+        x: node.x * cellSize + cellSize / 2,
+        y: node.y * cellSize + cellSize / 2
+      };
+
+      // Node background
+      ctx.beginPath();
+      ctx.arc(center.x, center.y, cellSize * 0.15, 0, Math.PI * 2);
+      ctx.fillStyle = "rgba(255, 255, 255, 0.1)";
+      ctx.fill();
+
+      // Node border
+      ctx.beginPath();
+      ctx.arc(center.x, center.y, cellSize * 0.18, 0, Math.PI * 2);
+      ctx.strokeStyle = colors.primary + "4d"; // Add transparency
+      ctx.lineWidth = 2;
+      ctx.stroke();
     });
 
-    // 1. Draw Grid Nodes (Empty/Walls vs Valid)
-    // We only have a list of valid 'nodes'. Any grid cell NOT in 'nodes' is a wall.
-    // However, for this visual style, let's draw faint markers for all grid cells 
-    // and highlight the valid ones.
+    // Draw start node
+    const startPixel = {
+      x: level.start.x * cellSize + cellSize / 2,
+      y: level.start.y * cellSize + cellSize / 2
+    };
+    ctx.beginPath();
+    ctx.arc(startPixel.x, startPixel.y, cellSize * 0.25, 0, Math.PI * 2);
+    ctx.fillStyle = colors.primary;
+    ctx.shadowColor = colors.primary;
+    ctx.shadowBlur = 15;
+    ctx.fill();
+    ctx.shadowBlur = 0;
 
-    for (let x = 0; x < level.gridSize; x++) {
-      for (let y = 0; y < level.gridSize; y++) {
-        const p = { x, y };
-        const center = getPixel(p);
-
-        // Check if valid node
-        const isValid = level.nodes.some(n => n.x === x && n.y === y);
-
-        if (isValid) {
-          // Draw Valid Node
-          ctx.beginPath();
-          ctx.arc(center.x, center.y, cellSize * 0.15, 0, Math.PI * 2);
-          ctx.fillStyle = "rgba(255, 255, 255, 0.1)";
-          ctx.fill();
-
-          // Outer Glow Ring
-          ctx.beginPath();
-          ctx.arc(center.x, center.y, cellSize * 0.18, 0, Math.PI * 2);
-          ctx.strokeStyle = "rgba(0, 243, 255, 0.3)";
-          ctx.lineWidth = 2;
-          ctx.stroke();
-        }
-      }
-    }
-
-    // 2. Draw Start Node
-    if (level.start) {
-      const startPixel = getPixel(level.start);
-      ctx.beginPath();
-      ctx.arc(startPixel.x, startPixel.y, cellSize * 0.25, 0, Math.PI * 2);
-      ctx.fillStyle = "#00f3ff"; // Neon Cyan
-      ctx.shadowColor = "#00f3ff";
-      ctx.shadowBlur = 15;
-      ctx.fill();
-      ctx.shadowBlur = 0; // Reset
-    }
-
-    // 3. Draw Connected Path
+    // Draw path
     if (path.length > 1) {
       ctx.beginPath();
-      const p0 = getPixel(path[0]);
-      if (p0) {
-        ctx.moveTo(p0.x, p0.y);
+      ctx.lineCap = "round";
+      ctx.lineJoin = "round";
+      ctx.lineWidth = cellSize * 0.15;
+      ctx.strokeStyle = colors.primary;
+      ctx.shadowColor = colors.primary;
+      ctx.shadowBlur = 20;
 
-        for (let i = 1; i < path.length; i++) {
-          const pi = getPixel(path[i]);
-          if (pi) ctx.lineTo(pi.x, pi.y);
+      path.forEach((point, index) => {
+        const pixel = {
+          x: point.x * cellSize + cellSize / 2,
+          y: point.y * cellSize + cellSize / 2
+        };
+        if (index === 0) {
+          ctx.moveTo(pixel.x, pixel.y);
+        } else {
+          ctx.lineTo(pixel.x, pixel.y);
         }
+      });
+      ctx.stroke();
+      ctx.shadowBlur = 0;
 
-        ctx.lineCap = "round";
-        ctx.lineJoin = "round";
-        ctx.lineWidth = cellSize * 0.15;
-        ctx.strokeStyle = "#00f3ff";
-        ctx.shadowColor = "#00f3ff";
-        ctx.shadowBlur = 20;
-        ctx.stroke();
-        ctx.shadowBlur = 0;
-      }
+      // Draw path head with pulse
+      const headPixel = {
+        x: path[path.length - 1].x * cellSize + cellSize / 2,
+        y: path[path.length - 1].y * cellSize + cellSize / 2
+      };
+      const time = Date.now() / 1000;
+      const pulseSize = cellSize * 0.12 + Math.sin(time * 4) * cellSize * 0.03;
+      ctx.beginPath();
+      ctx.arc(headPixel.x, headPixel.y, pulseSize, 0, Math.PI * 2);
+      ctx.fillStyle = colors.accent;
+      ctx.fill();
     }
 
-    // 4. Draw Current Head
-    if (path.length > 0) {
-      const currentHead = path[path.length - 1];
-      const headPixel = getPixel(currentHead);
+    // Draw hint path
+    if (showHint && hintPath && hintPath.length > 0) {
+      ctx.globalAlpha = 0.3;
+      ctx.strokeStyle = colors.secondary;
+      ctx.lineWidth = cellSize * 0.1;
+      ctx.setLineDash([cellSize * 0.2, cellSize * 0.1]);
 
-      if (headPixel) {
-        // Pulse animation for head
-        const time = Date.now() / 500;
-        const pulseSize = cellSize * 0.2 + Math.sin(time) * 2;
+      ctx.beginPath();
+      hintPath.forEach((pt, index) => {
+        const pixel = {
+          x: pt.x * cellSize + cellSize / 2,
+          y: pt.y * cellSize + cellSize / 2
+        };
+        if (index === 0) {
+          ctx.moveTo(pixel.x, pixel.y);
+        } else {
+          ctx.lineTo(pixel.x, pixel.y);
+        }
+      });
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.globalAlpha = 1;
 
-        ctx.beginPath();
-        ctx.arc(headPixel.x, headPixel.y, pulseSize, 0, Math.PI * 2);
-        ctx.fillStyle = "#ffffff";
-        ctx.fill();
-      }
-    }
-
-    // 5. Draw Hints (if active)
-    if (showHint && hintPath) {
-      ctx.font = `bold ${cellSize * 0.4}px "Exo 2"`;
+      // Hint text
+      ctx.font = `${cellSize * 0.12}px Arial`;
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
-      ctx.fillStyle = "#8a2be2"; // Purple hint text
+      ctx.fillStyle = colors.secondary;
 
       hintPath.forEach((pt, index) => {
-        const pix = getPixel(pt);
-        // Don't draw over start or current path if it's correct so far
-        // Just draw simple numbers
-        ctx.fillText(`${index + 1}`, pix.x, pix.y);
+        if (index === 0) return; // Skip start node
+        const pixel = {
+          x: pt.x * cellSize + cellSize / 2,
+          y: pt.y * cellSize + cellSize / 2
+        };
+        ctx.fillText((index).toString(), pixel.x, pixel.y);
       });
     }
+  }, [level, cellSize, path, showHint, hintPath, getThemeColors]);
 
-    // Request animation frame for the pulse effect
+  useEffect(() => {
+    draw();
     const animationId = requestAnimationFrame(() => {
-      // Force re-render for pulse animation
-      // We need a state or ref change to trigger re-render of component?
-      // Actually, just calling a dummy state update or using a ref to loop is better.
-      // For simplicity in React, we'll let it be static or use a simple timer.
-      // BUT, since we have the useEffect dependency array, this only runs on state change.
+      draw();
       // Let's rely on standard React updates for dragging, and maybe add a timer for idle pulse.
     });
 
