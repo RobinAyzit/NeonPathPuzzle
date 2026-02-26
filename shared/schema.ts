@@ -10,7 +10,7 @@ export const userProgress = pgTable("user_progress", {
   levelId: integer("level_id").notNull(),
   completed: boolean("completed").default(false),
   hintsUsed: boolean("hints_used").default(false),
-  updatedAt: timestamp("updated_at").defaultNow(),
+  updatedAt: timestamp("updated_at"),
 });
 
 // === SCHEMAS ===

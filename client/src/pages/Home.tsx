@@ -1,9 +1,18 @@
-import { useLevels } from "@/hooks/use-game";
+import { useState, useEffect } from "react";
+import { useLevels, useUserId } from "@/hooks/use-game";
 import { LevelCard } from "@/components/LevelCard";
+import { StartMenu } from "@/components/StartMenu";
 import { Loader2 } from "lucide-react";
 
 export default function Home() {
-  const { data: levels, isLoading, error } = useLevels();
+  const [gameStarted, setGameStarted] = useState(false);
+  const userId = useUserId();
+  const { data: levels, isLoading, error, refetch } = useLevels(userId);
+
+  // Refetch levels when returning to home
+  useEffect(() => {
+    refetch();
+  }, [gameStarted, refetch]);
 
   if (isLoading) {
     return (
@@ -20,6 +29,10 @@ export default function Home() {
         <p>Failed to load level matrix.</p>
       </div>
     );
+  }
+
+  if (!gameStarted) {
+    return <StartMenu onStart={() => setGameStarted(true)} />;
   }
 
   return (
@@ -39,7 +52,7 @@ export default function Home() {
         {/* Level Grid */}
         <div className="grid grid-cols-3 sm:grid-cols-5 md:grid-cols-8 lg:grid-cols-10 gap-4">
           {levels.map((level, idx) => (
-            <LevelCard 
+            <LevelCard
               key={level.id}
               id={level.id}
               isLocked={level.isLocked}

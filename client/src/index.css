@@ -35,6 +35,19 @@ body {
   @apply bg-background text-foreground overflow-hidden overscroll-none;
   font-family: 'Exo 2', sans-serif;
   touch-action: none; /* Prevent scroll on mobile while playing */
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-user-drag: none;
+  position: fixed;
+  width: 100%;
+  height: 100%;
+}
+
+html {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
 }
 
 h1, h2, h3, h4, h5, h6 {
@@ -74,4 +87,21 @@ h1, h2, h3, h4, h5, h6 {
 .glass-card {
   @apply bg-opacity-30 backdrop-blur-md border border-white/10 shadow-xl;
   background-color: rgba(16, 22, 40, 0.7);
+}
+
+/* Prevent accidental mobile gestures */
+#root {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  position: fixed;
+  top: 0;
+  left: 0;
+}
+
+/* Canvas optimization for mobile */
+canvas {
+  image-rendering: crisp-edges;
+  image-rendering: pixelated;
+  touch-action: none;
 }

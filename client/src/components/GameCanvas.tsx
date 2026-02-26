@@ -1,18 +1,22 @@
 import React, { useRef, useEffect, useState, useCallback } from "react";
 import { type LevelResponse, type Point } from "@shared/schema";
 import { motion } from "framer-motion";
+import { playMoveSound, playBacktrackSound, playLoseLifeSound, playWinSound } from "@/lib/sounds";
 
 interface GameCanvasProps {
   level: LevelResponse;
   onComplete: () => void;
   showHint: boolean;
   hintPath?: Point[];
+  onBacktrack: () => void;
+  onLoseLife: () => void;
+  onWin: () => void;
 }
 
-export function GameCanvas({ level, onComplete, showHint, hintPath }: GameCanvasProps) {
+export function GameCanvas({ level, onComplete, showHint, hintPath, onBacktrack, onLoseLife, onWin }: GameCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  
+
   // Game State
   const [path, setPath] = useState<Point[]>([]);
   const [isDragging, setIsDragging] = useState(false);
@@ -29,24 +33,24 @@ export function GameCanvas({ level, onComplete, showHint, hintPath }: GameCanvas
     if (!containerRef.current || !canvasRef.current) return;
     const { width, height } = containerRef.current.getBoundingClientRect();
     const size = Math.min(width, height);
-    
+
     // Make canvas slightly smaller than container padding
     const displaySize = size * 0.95;
-    
+
     // Support high DPI screens
     const dpr = window.devicePixelRatio || 1;
     canvasRef.current.width = displaySize * dpr;
     canvasRef.current.height = displaySize * dpr;
     canvasRef.current.style.width = `${displaySize}px`;
     canvasRef.current.style.height = `${displaySize}px`;
-    
+
     const context = canvasRef.current.getContext("2d");
     if (context) context.scale(dpr, dpr);
 
     setCellSize(displaySize / level.gridSize);
-    
+
     // Center grid in canvas if non-square
-    setOffset({ x: 0, y: 0 }); // Simplified centering logic for now
+    setOffset({ x: 0, y: 0 });
   }, [level.gridSize]);
 
   useEffect(() => {
@@ -76,29 +80,29 @@ export function GameCanvas({ level, onComplete, showHint, hintPath }: GameCanvas
     // We only have a list of valid 'nodes'. Any grid cell NOT in 'nodes' is a wall.
     // However, for this visual style, let's draw faint markers for all grid cells 
     // and highlight the valid ones.
-    
+
     for (let x = 0; x < level.gridSize; x++) {
       for (let y = 0; y < level.gridSize; y++) {
         const p = { x, y };
         const center = getPixel(p);
-        
+
         // Check if valid node
         const isValid = level.nodes.some(n => n.x === x && n.y === y);
-        
+
         if (isValid) {
           // Draw Valid Node
           ctx.beginPath();
           ctx.arc(center.x, center.y, cellSize * 0.15, 0, Math.PI * 2);
           ctx.fillStyle = "rgba(255, 255, 255, 0.1)";
           ctx.fill();
-          
+
           // Outer Glow Ring
           ctx.beginPath();
           ctx.arc(center.x, center.y, cellSize * 0.18, 0, Math.PI * 2);
           ctx.strokeStyle = "rgba(0, 243, 255, 0.3)";
           ctx.lineWidth = 2;
           ctx.stroke();
-        } 
+        }
       }
     }
 
@@ -120,12 +124,12 @@ export function GameCanvas({ level, onComplete, showHint, hintPath }: GameCanvas
       const p0 = getPixel(path[0]);
       if (p0) {
         ctx.moveTo(p0.x, p0.y);
-        
+
         for (let i = 1; i < path.length; i++) {
           const pi = getPixel(path[i]);
           if (pi) ctx.lineTo(pi.x, pi.y);
         }
-        
+
         ctx.lineCap = "round";
         ctx.lineJoin = "round";
         ctx.lineWidth = cellSize * 0.15;
@@ -141,12 +145,12 @@ export function GameCanvas({ level, onComplete, showHint, hintPath }: GameCanvas
     if (path.length > 0) {
       const currentHead = path[path.length - 1];
       const headPixel = getPixel(currentHead);
-      
+
       if (headPixel) {
         // Pulse animation for head
         const time = Date.now() / 500;
         const pulseSize = cellSize * 0.2 + Math.sin(time) * 2;
-        
+
         ctx.beginPath();
         ctx.arc(headPixel.x, headPixel.y, pulseSize, 0, Math.PI * 2);
         ctx.fillStyle = "#ffffff";
@@ -160,7 +164,7 @@ export function GameCanvas({ level, onComplete, showHint, hintPath }: GameCanvas
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
       ctx.fillStyle = "#8a2be2"; // Purple hint text
-      
+
       hintPath.forEach((pt, index) => {
         const pix = getPixel(pt);
         // Don't draw over start or current path if it's correct so far
@@ -171,12 +175,12 @@ export function GameCanvas({ level, onComplete, showHint, hintPath }: GameCanvas
 
     // Request animation frame for the pulse effect
     const animationId = requestAnimationFrame(() => {
-        // Force re-render for pulse animation
-        // We need a state or ref change to trigger re-render of component?
-        // Actually, just calling a dummy state update or using a ref to loop is better.
-        // For simplicity in React, we'll let it be static or use a simple timer.
-        // BUT, since we have the useEffect dependency array, this only runs on state change.
-        // Let's rely on standard React updates for dragging, and maybe add a timer for idle pulse.
+      // Force re-render for pulse animation
+      // We need a state or ref change to trigger re-render of component?
+      // Actually, just calling a dummy state update or using a ref to loop is better.
+      // For simplicity in React, we'll let it be static or use a simple timer.
+      // BUT, since we have the useEffect dependency array, this only runs on state change.
+      // Let's rely on standard React updates for dragging, and maybe add a timer for idle pulse.
     });
 
     return () => cancelAnimationFrame(animationId);
@@ -186,11 +190,22 @@ export function GameCanvas({ level, onComplete, showHint, hintPath }: GameCanvas
 
   // Game Logic
   const getGridPos = (clientX: number, clientY: number) => {
-    if (!canvasRef.current) return null;
+    if (!canvasRef.current || cellSize === 0) return null;
     const rect = canvasRef.current.getBoundingClientRect();
-    const x = Math.floor((clientX - rect.left) / (rect.width / level.gridSize));
-    const y = Math.floor((clientY - rect.top) / (rect.height / level.gridSize));
-    return { x, y };
+
+    // Simple calculation based on canvas display size
+    const relX = clientX - rect.left;
+    const relY = clientY - rect.top;
+
+    const gridX = Math.floor(relX / cellSize);
+    const gridY = Math.floor(relY / cellSize);
+
+    // Validate grid boundaries
+    if (gridX < 0 || gridY < 0 || gridX >= level.gridSize || gridY >= level.gridSize) {
+      return null;
+    }
+
+    return { x: gridX, y: gridY };
   };
 
   const isAdjacent = (p1: Point, p2: Point) => {
@@ -200,10 +215,10 @@ export function GameCanvas({ level, onComplete, showHint, hintPath }: GameCanvas
   };
 
   const handleInputStart = (e: React.MouseEvent | React.TouchEvent) => {
-    e.preventDefault(); // Prevent scrolling
+    e.preventDefault();
     const clientX = 'touches' in e ? e.touches[0].clientX : (e as React.MouseEvent).clientX;
     const clientY = 'touches' in e ? e.touches[0].clientY : (e as React.MouseEvent).clientY;
-    
+
     const pos = getGridPos(clientX, clientY);
     if (!pos) return;
 
@@ -224,7 +239,7 @@ export function GameCanvas({ level, onComplete, showHint, hintPath }: GameCanvas
 
     const clientX = 'touches' in e ? e.touches[0].clientX : (e as React.MouseEvent).clientX;
     const clientY = 'touches' in e ? e.touches[0].clientY : (e as React.MouseEvent).clientY;
-    
+
     const pos = getGridPos(clientX, clientY);
     if (!pos) return;
 
@@ -244,8 +259,10 @@ export function GameCanvas({ level, onComplete, showHint, hintPath }: GameCanvas
     if (path.length > 1) {
       const prevNode = path[path.length - 2];
       if (prevNode.x === pos.x && prevNode.y === pos.y) {
-        // Backtrack: Remove last node
+        // Backtrack: Remove last node and notify
         setPath(prev => prev.slice(0, -1));
+        playBacktrackSound();
+        onBacktrack();
         return;
       }
     }
@@ -257,22 +274,36 @@ export function GameCanvas({ level, onComplete, showHint, hintPath }: GameCanvas
     // Valid move: Add to path
     const newPath = [...path, pos];
     setPath(newPath);
+    playMoveSound();
 
     // Check Win Condition immediately on move?
     if (newPath.length === level.nodes.length) {
       setIsDragging(false);
+      playWinSound();
       onComplete();
     }
   };
 
   const handleInputEnd = () => {
+    if (isDragging && path.length < level.nodes.length && path.length > 1) {
+      // Player let go before finishing - lose a life
+      playLoseLifeSound();
+      onLoseLife();
+      setPath([level.start]);
+    }
     setIsDragging(false);
   };
 
   return (
-    <div 
+    <div
       ref={containerRef}
-      className="w-full h-full flex items-center justify-center p-4 relative"
+      className="w-full h-full flex items-center justify-center p-2 md:p-4 relative select-none"
+      style={{
+        WebkitTouchCallout: "none",
+        WebkitUserSelect: "none",
+        touchAction: "none",
+        overscrollBehavior: "contain"
+      } as any}
     >
       <motion.canvas
         ref={canvasRef}
@@ -286,7 +317,17 @@ export function GameCanvas({ level, onComplete, showHint, hintPath }: GameCanvas
         onTouchStart={handleInputStart}
         onTouchMove={handleInputMove}
         onTouchEnd={handleInputEnd}
-        className="touch-none cursor-crosshair"
+        onTouchCancel={handleInputEnd}
+        className="touch-none cursor-crosshair max-w-full max-h-full"
+        style={{
+          WebkitTouchCallout: "none",
+          WebkitUserSelect: "none",
+          userSelect: "none",
+          WebkitUserDrag: "none",
+          touchAction: "none",
+          WebkitFontSmoothing: "antialiased",
+          imageRendering: "pixelated"
+        } as any}
       />
     </div>
   );

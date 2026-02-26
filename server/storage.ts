@@ -10,37 +10,47 @@ export interface IStorage {
 
 export class DatabaseStorage implements IStorage {
   async getUserProgress(userId: string): Promise<number[]> {
-    const progress = await db
-      .select()
-      .from(userProgress)
-      .where(and(eq(userProgress.userId, userId), eq(userProgress.completed, true)));
-    
-    return progress.map(p => p.levelId);
+    try {
+      const progress = await db
+        .select()
+        .from(userProgress)
+        .where(and(eq(userProgress.userId, userId), eq(userProgress.completed, 1 as any)));
+      
+      return progress.map(p => p.levelId);
+    } catch (error) {
+      console.error("Error getting user progress:", error);
+      return [];
+    }
   }
 
   async updateUserProgress(userId: string, levelId: number, completed: boolean, hintsUsed: boolean): Promise<void> {
-    // Check if exists
-    const [existing] = await db
-      .select()
-      .from(userProgress)
-      .where(and(eq(userProgress.userId, userId), eq(userProgress.levelId, levelId)));
+    try {
+      // Check if exists
+      const existing = await db
+        .select()
+        .from(userProgress)
+        .where(and(eq(userProgress.userId, userId), eq(userProgress.levelId, levelId)));
 
-    if (existing) {
-      await db
-        .update(userProgress)
-        .set({ 
-          completed: completed || existing.completed, 
-          hintsUsed: hintsUsed || existing.hintsUsed,
-          updatedAt: new Date() 
-        })
-        .where(eq(userProgress.id, existing.id));
-    } else {
-      await db.insert(userProgress).values({
-        userId,
-        levelId,
-        completed,
-        hintsUsed,
-      });
+      if (existing.length > 0) {
+        await db
+          .update(userProgress)
+          .set({ 
+            completed: (completed || existing[0].completed) ? 1 : 0,
+            hintsUsed: (hintsUsed || existing[0].hintsUsed) ? 1 : 0,
+            updatedAt: new Date() 
+          })
+          .where(eq(userProgress.id, existing[0].id));
+      } else {
+        await db.insert(userProgress).values({
+          userId,
+          levelId,
+          completed: completed ? 1 : 0,
+          hintsUsed: hintsUsed ? 1 : 0,
+          updatedAt: new Date()
+        } as any);
+      }
+    } catch (error) {
+      console.error("Error updating user progress:", error);
     }
   }
 }

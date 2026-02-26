@@ -38,6 +38,7 @@ async function buildAll() {
   console.log("building client...");
   await viteBuild();
 
+  /*
   console.log("building server...");
   const pkg = JSON.parse(await readFile("package.json", "utf-8"));
   const allDeps = [
@@ -59,9 +60,12 @@ async function buildAll() {
     external: externals,
     logLevel: "info",
   });
+  */
 }
 
 buildAll().catch((err) => {
+  console.error("Build failed!");
   console.error(err);
+  if (err.stack) console.error(err.stack);
   process.exit(1);
 });

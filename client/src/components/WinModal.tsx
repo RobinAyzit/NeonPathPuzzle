@@ -1,7 +1,9 @@
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
-import { RefreshCw, Play, Home } from "lucide-react";
+import { RefreshCw, Play, Home, Copy, Check } from "lucide-react";
 import { Link } from "wouter";
+import { generateLevelCode } from "@/lib/levelCodes";
+import { useState } from "react";
 
 interface WinModalProps {
   isOpen: boolean;
@@ -11,6 +13,16 @@ interface WinModalProps {
 }
 
 export function WinModal({ isOpen, levelId, onNext, onReplay }: WinModalProps) {
+  const [codeCopied, setCodeCopied] = useState(false);
+  const levelCode = generateLevelCode(levelId);
+  const showCode = levelId >= 10;
+
+  const handleCopyCode = () => {
+    navigator.clipboard.writeText(levelCode);
+    setCodeCopied(true);
+    setTimeout(() => setCodeCopied(false), 2000);
+  };
+
   return (
     <AnimatePresence>
       {isOpen && (
@@ -36,6 +48,34 @@ export function WinModal({ isOpen, levelId, onNext, onReplay }: WinModalProps) {
                 </motion.h2>
                 <p className="text-muted-foreground font-exo">Amazing puzzle solving skills.</p>
               </div>
+
+              {/* Level Code Section */}
+              {showCode && (
+                <div className="bg-secondary/10 border border-secondary/30 rounded-lg p-4 space-y-2">
+                  <p className="text-sm font-exo text-muted-foreground">
+                    Congratulations, buddy, you've completed level {levelId} and your code is:
+                  </p>
+                  <motion.div
+                    initial={{ scale: 0.8 }}
+                    animate={{ scale: 1 }}
+                    className="flex items-center justify-center gap-3"
+                  >
+                    <code className="text-3xl font-mono font-bold text-secondary tracking-widest">
+                      {levelCode}
+                    </code>
+                    <button
+                      onClick={handleCopyCode}
+                      className="p-2 hover:bg-secondary/20 rounded transition-colors"
+                    >
+                      {codeCopied ? (
+                        <Check className="w-5 h-5 text-secondary" />
+                      ) : (
+                        <Copy className="w-5 h-5 text-secondary/60 hover:text-secondary" />
+                      )}
+                    </button>
+                  </motion.div>
+                </div>
+              )}
 
               <div className="flex flex-col gap-3 pt-4">
                 <Button 
