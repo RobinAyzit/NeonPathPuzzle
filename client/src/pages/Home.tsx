@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useLocation } from "wouter";
 import { useLevels, useUserId } from "@/hooks/use-game";
 import { LevelCard } from "@/components/LevelCard";
 import { StartMenu } from "@/components/StartMenu";
@@ -11,6 +12,7 @@ import { Loader2, Trophy } from "lucide-react";
 export default function Home() {
   const [gameStarted, setGameStarted] = useState(false);
   const [activeTab, setActiveTab] = useState("levels");
+  const [, setLocation] = useLocation();
   const userId = useUserId();
   const { data: levels, isLoading, error, refetch } = useLevels(userId);
 
@@ -18,6 +20,11 @@ export default function Home() {
   useEffect(() => {
     refetch();
   }, [gameStarted, refetch]);
+
+  const handleStartLevel = (levelId: number) => {
+    setGameStarted(true);
+    setLocation(`/play/${levelId}`);
+  };
 
   if (isLoading) {
     return (
@@ -37,7 +44,7 @@ export default function Home() {
   }
 
   if (!gameStarted) {
-    return <StartMenu onStart={() => setGameStarted(true)} />;
+    return <StartMenu onStart={() => setGameStarted(true)} onStartLevel={handleStartLevel} />;
   }
 
   return (
@@ -79,7 +86,7 @@ export default function Home() {
                 <LevelCard
                   key={level.id}
                   id={level.id}
-                  isLocked={level.isLocked}
+                  isLocked={level.id !== 1 && level.isLocked}
                   isCompleted={level.isCompleted}
                   delay={idx % 20} // Stagger animation for visible items
                 />

@@ -12,6 +12,7 @@ import { playClickSound } from "@/lib/sounds";
 
 interface StartMenuProps {
   onStart: () => void;
+  onStartLevel?: (levelId: number) => void;
 }
 
 type MenuScreen = "main" | "info" | "completed";
@@ -192,7 +193,7 @@ function ThemeButton() {
   );
 }
 
-export function StartMenu({ onStart }: StartMenuProps) {
+export function StartMenu({ onStart, onStartLevel }: StartMenuProps) {
   const [screen, setScreen] = useState<MenuScreen>("main");
   const [codeInput, setCodeInput] = useState("");
   const [codeError, setCodeError] = useState("");
@@ -205,6 +206,14 @@ export function StartMenu({ onStart }: StartMenuProps) {
   const handleButtonClick = (callback: () => void, buttonId: string) => {
     playClickSound();
     callback();
+  };
+
+  const handleStartClick = () => {
+    if (onStartLevel) {
+      onStartLevel(1);
+    } else {
+      onStart();
+    }
   };
 
   const completedLevels = levels?.filter(l => l.isCompleted) || [];
@@ -313,7 +322,7 @@ export function StartMenu({ onStart }: StartMenuProps) {
                     className="flex flex-col gap-4"
                   >
                     <Button
-                      onClick={() => handleButtonClick(onStart, "start")}
+                      onClick={() => handleButtonClick(handleStartClick, "start")}
                       onMouseEnter={() => setHoveredButton("start")}
                       onMouseLeave={() => setHoveredButton(null)}
                       className={`
