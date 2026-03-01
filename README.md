@@ -119,7 +119,7 @@ npm run build
 
 <div align="center">
 
-**Created by © nRn World**
+**Created 2026 by © nRn World**
 
 📧 **Email**: [bynrnworld@gmail.com](mailto:bynrnworld@gmail.com)
 
